@@ -1,0 +1,280 @@
+global:
+  date_format: '%Y-%m-%d'
+  encoding: utf-8-sig
+  csv_separator: ';'
+  add_timestamp_to_files: true
+  empresa:
+    nome: EMCCAMP
+    cnpj: '19.403.252/0001-90'
+flags:
+  filtros_batimento:
+    habilitar: true
+    tipos_excluir:
+      - PERMUTA
+      - Financiamento Fixo
+paths:
+  projeto_root: .
+  logs: data/logs
+  input:
+    emccamp: data/input/emccamp
+    max: data/input/base_max
+    judicial: data/input/judicial
+    baixas: data/input/baixas
+    doublecheck_acordo: data/input/doublecheck_acordo
+  output:
+    base: data/output
+logging:
+  level: INFO
+  format: '%(asctime)s - %(message)s'
+  date_format: '%Y-%m-%d %H:%M:%S'
+  console_handler:
+    enabled: false
+  file_handler:
+    enabled: false
+    filename: pipeline_emccamp.log
+queries:
+  max:
+    template: max
+    params:
+      mo_cliente_id: 77398
+    filters:
+      vencimento:
+        field: MoDataVencimento
+        start_env: MAX_DATA_VENCIMENTO_INICIAL
+        end_env: MAX_DATA_VENCIMENTO_FINAL
+  autojur:
+    template: autojur
+    params:
+      grupo_empresarial: EMCCAMP
+  maxsmart_judicial:
+    template: maxsmart_judicial
+    params:
+      campanhas_id: 4
+  doublecheck_acordo:
+    template: doublecheck_acordo
+    params: {}
+max_processor:
+  export:
+    filename_prefix: max_tratada
+    inconsistencies_prefix: max_inconsistencias
+emccamp_processor:
+  columns:
+    mapping:
+      CLIENTE: NOME_RAZAO_SOCIAL
+      CPF: CPFCNPJ_CLIENTE
+      NUM_VENDA: NUM_VENDA
+      ID_PARCELA: ID_PARCELA
+      VENCIMENTO: VENCIMENTO
+      VALOR_ATUALIZADO: VALOR
+      NOME_EMPREENDIMENTO: EMPREENDIMENTO
+      DSC_SIT_VENDA: STATUS_TITULO
+      TIPO_PAGTO: TIPO_PAGTO
+      VALOR_ORIGINAL: VALOR_ORIGINAL
+    required:
+      - CPFCNPJ_CLIENTE
+      - NUM_VENDA
+      - ID_PARCELA
+      - VENCIMENTO
+      - VALOR
+  defaults:
+    CAMPANHA: ''
+    CREDOR: EMCCAMP
+    CNPJ_CREDOR: ''
+    EMPREENDIMENTO: ''
+    NUMERO_CONTRATO: ''
+    DATA_CADASTRO: ''
+    TIPO_PARCELA: ''
+  export:
+    filename_prefix: emccamp_tratada
+    inconsistencies_prefix: emccamp_inconsistencias
+    subdir: emccamp_tratada
+  tratamento:
+    chave_campos:
+      - NUM_VENDA
+      - ID_PARCELA
+    chave_delimitador: ''
+    inconsistencias_obrigatorias:
+      - CPFCNPJ_CLIENTE
+      - NUM_VENDA
+      - ID_PARCELA
+      - VENCIMENTO
+      - VALOR
+    layout_saida:
+      - CAMPANHA
+      - CREDOR
+      - CNPJ_CREDOR
+      - CPFCNPJ_CLIENTE
+      - NOME_RAZAO_SOCIAL
+      - NUMERO_CONTRATO
+      - EMPREENDIMENTO
+      - DATA_CADASTRO
+      - PARCELA
+      - CHAVE
+      - VENCIMENTO
+      - VALOR
+      - STATUS_TITULO
+      - TIPO_PARCELA
+      - TIPO_PAGTO
+batimento_processor:
+  export:
+    filename_prefix: emccamp_batimento
+baixa:
+  export:
+    filename_prefix: emccamp_baixa
+    formato: zip
+    com_recebimento_prefix: baixa_com_recebimento
+    sem_recebimento_prefix: baixa_sem_recebimento
+  status_baixa_fixo: '98'
+  chaves:
+    emccamp: CHAVE
+    max: PARCELA
+  filtros:
+    max:
+      campanhas:
+        - '000041 - EMCCAMP'
+        - '000041-EMCCAMP'
+        - 'EMCCAMP 41'
+      status_titulo:
+        - ABERTO
+inputs:
+  clientes_judiciais_path: data/input/judicial/ClientesJudiciais.zip
+  baixa_emccamp_path: data/input/baixas/baixa_emccamp.zip
+  acordos_abertos_path: data/input/doublecheck_acordo/acordos_abertos.zip
+
+devolucao:
+  # Filtro de campanha (vazio = aceita todas)
+  campanha_termo: "EMCCAMP"
+  
+  # Status a excluir do MAX (ex: ["PAGO", "CANCELADO"])
+  status_excluir: []
+  
+  # Colunas chave para join
+  chaves:
+    emccamp: CHAVE
+    max: CHAVE
+  
+  # Filtros para aplicar no MAX antes do anti-join
+  filtros_max:
+    status_em_aberto: true
+  
+  # Filtros para aplicar no EMCCAMP antes do anti-join
+  filtros_emccamp:
+    status_em_aberto: true
+  
+  # Configuração de exportação
+  export:
+    filename_prefix: "emccamp_devolucao"
+    subdir: "devolucao"
+    add_timestamp: true
+    gerar_geral: false
+  
+  # Status fixo para devolução
+  status_devolucao_fixo: "98"
+  
+  # Remoção de registros por arquivo de baixa
+  remover_por_baixa: true
+
+mappings:
+  emccamp:
+    rename:
+      CODCOLIGADA: COD_COLIGADA
+      NOME_COLIGADA: NOME_COLIGADA
+      CLIENTE: NOME_RAZAO_SOCIAL
+      CPF: CPF_CNPJ
+      NUM_VENDA: CONTRATO
+      PARCELA: N_PARCELA
+      ID_PARCELA: PARCELA
+      VENCIMENTO: DATA_VENCIMENTO
+      VALOR_ORIGINAL: VALOR_PARCELA
+      VALOR_ATUALIZADO: VALOR_ATUALIZADO
+      TIPO_PAGTO: TIPO_PAGTO
+      NOME_EMPREENDIMENTO: NOME_EMPREENDIMENTO
+      CNPJ_EMPREENDIMENTO: CNPJ_EMPREENDIMENTO
+      CNPJ_CREDOR: CNPJ_CREDOR
+      OBSERVACAO_PARCELA: OBSERVACAO_PARCELA
+      ID_NEGOCIADOR: ID_NEGOCIADOR
+    key:
+      components:
+        - CONTRATO
+        - PARCELA
+      sep: "-"
+    required:
+      - CONTRATO
+      - PARCELA
+      - DATA_VENCIMENTO
+      - VALOR_PARCELA
+      - CPF_CNPJ
+  max:
+    rename:
+      CAMPANHA: CAMPANHA
+      CREDOR: CREDOR
+      CNPJ_CREDOR: CNPJ_CREDOR
+      CPFCNPJ_CLIENTE: CPF_CNPJ
+      NOME_RAZAO_SOCIAL: NOME_RAZAO_SOCIAL
+      NUMERO_CONTRATO: NUMERO_CONTRATO
+      EMPREENDIMENTO: EMPREENDIMENTO
+      DATA_CADASTRO: DATA_CADASTRO
+      PARCELA: PARCELA
+      Movimentacoes_ID: MOVIMENTACOES_ID
+      VENCIMENTO: DATA_VENCIMENTO
+      VALOR: VALOR
+      STATUS_TITULO: STATUS_TITULO
+      TIPO_PARCELA: TIPO_PARCELA
+    preserve:
+      - DT_BAIXA
+      - RECEBIDO
+    key:
+      use_parcela_as_chave: true
+      components:
+        - NUMERO_CONTRATO
+        - PARCELA
+      sep: "-"
+    validation:
+      # Exige formato numérico EXATO: 3+ dígitos, hífen, 2+ dígitos (SEM grupos extras)
+      # Válido: 12345-01, 123-12, 1234-001
+      # Inválido: JM-3, hon-1, 123-1, 123-12-3, 1234-12-34, few/14, 1, 5485
+      parcela_regex: '^[0-9]{3,}-[0-9]{2,}$'
+    required:
+      - NUMERO_CONTRATO
+      - PARCELA
+      - DATA_VENCIMENTO
+      - VALOR
+      - CPF_CNPJ
+enriquecimento:
+  emccamp_batimento:
+    input:
+      path: data/output/emccamp_tratada/emccamp_tratada_*.zip
+    key:
+      components:
+        - CONTRATO
+        - PARCELA
+      separator: "-"
+      column_name: CHAVE
+    filters:
+      key:
+        source_path: data/output/batimento/emccamp_batimento_*.zip
+        column: PARCELA
+    output:
+      dir: data/output/enriquecimento_contato_emccamp
+      csv_name: enriquecimento_contato_emccamp.csv
+      zip_name: enriquecimento_contato_emccamp.zip
+    mapping:
+      cpf: CPF_CNPJ
+      nome: NOME_RAZAO_SOCIAL
+      data_base: DATA_VENCIMENTO
+      telefones:
+        - TELEFONE
+      emails:
+        - EMAIL
+    rules:
+      limpar_telefone: true
+      descartar_email_sem_arroba: true
+      observacao_prefix: "Base Emccamp"
+      telefone_principal_value: "1"
+      deduplicar_por:
+        - CPFCNPJ CLIENTE
+        - CONTATO
+        - TIPO
+    csv:
+      delimiter: ";"
+      encoding: utf-8

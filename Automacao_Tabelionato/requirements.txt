@@ -1,0 +1,16 @@
+# Dependencias do Projeto Tabelionato
+
+# Processamento de dados
+pandas>=2.3.1,<2.4.0  # Manipulacao e analise de dados
+numpy>=1.26.4,<3.0.0  # Compatibilidade garantida com dependencias nativas
+
+# Conexao com banco de dados
+pyodbc>=4.0.39  # Conexao com SQL Server
+
+# Configuracao e ambiente
+python-dotenv>=1.0.0  # Carregamento de variaveis de ambiente
+
+# Compressao e descompressao
+py7zr>=0.20.5  # Suporte para arquivos 7z caso necessario
+
+pyautogui>=0.9.54

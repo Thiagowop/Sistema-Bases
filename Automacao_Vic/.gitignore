@@ -1,0 +1,65 @@
+# Global Python caches
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+env.*/
+ENV*/
+
+# Environment secrets
+.env
+.env.*
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+pip-wheel-*
+
+# Logs
+*.log
+logs/
+data/logs/*
+!data/logs/.gitkeep
+
+# Data outputs (preserve placeholders)
+data/output/*
+data/output/*/*
+data/output/*/*/*
+!data/output/.gitkeep
+!data/output/*/.gitkeep
+!data/output/*/*/.gitkeep
+!data/output/*/*/*/.gitkeep
+
+# Data inputs (keep gitkeep files)
+data/input/*/*
+data/input/*/*/*
+!data/input/.gitkeep
+!data/input/*/.gitkeep
+!data/input/*/*/.gitkeep
+!data/input/*/*/*/.gitkeep
+
+# Tabelionato exports
+Tabelionato/data/output/*
+Tabelionato/data/logs/*
+!Tabelionato/data/output/.gitkeep
+!Tabelionato/data/logs/.gitkeep
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+desktop.ini
+data/*.zip

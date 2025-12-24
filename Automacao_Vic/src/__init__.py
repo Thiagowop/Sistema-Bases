@@ -1,0 +1,1 @@
+# Módulo src - Utilitários e configurações do projeto VIC

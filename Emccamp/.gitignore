@@ -1,0 +1,65 @@
+## Permitir versionamento do conteúdo de data/input
+!data/input/
+!data/input/**
+## Ambiente Virtual Python
+venv/
+.venv/
+env/
+.env/
+.env
+## Bytecode / caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+## Dados (ignorar arquivos gerados dentro de data, manter diretórios e .gitkeep)
+
+data/output/**
+!data/output/
+!data/output/**/
+!data/output/**/.gitkeep
+data/logs/**
+!data/logs/
+!data/logs/**/
+!data/logs/**/.gitkeep
+
+## Configuração sensível
+.env
+config/.env
+
+## IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+## Sistema Operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+## Temporários e artefatos
+*.tmp
+*.bak
+*.log
+
+# Notas:
+# - Arquivos gerados (ZIP/CSV) dentro de data/ são ignorados pelas regras acima.
+# - Evitamos regras globais como "*.zip" para não ignorar arquivos válidos fora de data/.
+# Sistema Operacional
+## Cache de testes / typing / build
+.pytest_cache/
+.mypy_cache/
+.cache/
+
+# Build / packaging
+build/
+dist/
+*.egg-info/
+pip-wheel-metadata/
+
+## Sistema Operacional
+.DS_Store

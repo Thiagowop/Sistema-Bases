@@ -1,0 +1,179 @@
+# Configurações centralizadas do projeto VIC
+# Arquivo único de configuração - não duplicar
+
+# Parâmetros globais
+global:
+  date_format: "%d/%m/%Y"
+  encoding: "utf-8-sig"
+  empresa:
+    cnpj: "12.086.678/0001-18"
+
+# Configurações para extração de email
+email:
+  imap_server: imap.gmail.com
+  imap_folder: INBOX
+  email_sender: noreply@fcleal.com.br
+  email_subject_keyword: Candiotto
+  attachment_filename: candiotto.zip
+  output_filename: VicCandiotto.zip
+  download_dir: data/input/vic
+  validation:
+    min_file_size_mb: 1.0  # Tamanho mínimo esperado em MB (base válida ~14MB, base com erro ~0.07MB)
+
+# Configurações para extração de email do Tabelionato
+email_tabelionato:
+  imap_server: imap.gmail.com
+  imap_folder: INBOX
+  email_sender: adriano@4protestobh.com
+  email_subject_keyword: "Base de Dados"
+  attachment_keyword: "Cobrança"
+  attachment_extensions: ['.zip']
+  output_filename: Tabelionato.zip
+  download_dir: Tabelionato/data/input/tabelionato
+
+# Configurações para extração MAX
+max:
+  output_dir: data/input/max
+  output_filename: MaxSmart.zip
+
+# Configuração alternativa para saída da base MAX do Tabelionato
+max_tabelionato:
+  output_dir: data/input/max
+  output_filename: MaxSmart.zip
+
+# Configurações para extração MAX Tabelionato
+tabelionato:
+  output_dir: data/input/max
+  output_filename: MaxSmart_Tabelionato.zip
+
+# Configurações de comparação
+comparacao:
+  legacy_dir: data/output/legacy
+
+# Configurações para extração Judicial
+judicial:
+  output_dir: data/input/judicial
+  output_filename: ClientesJudiciais.zip
+
+# Caminhos base
+paths:
+  projeto_root: .
+  logs: data/logs
+  input:
+    max: data/input/max
+    vic: data/input/vic
+    judicial: data/input/judicial
+    blacklist: data/input/blacklist
+  output:
+    base: data/output
+
+# Caminho específico para a base de clientes judiciais
+inputs:
+  clientes_judiciais_path: data/input/judicial/ClientesJudiciais.zip
+
+logging:
+  level: INFO
+  format: "%(asctime)s - %(message)s"
+  date_format: "%Y-%m-%d %H:%M:%S"
+  console_handler:
+    enabled: false
+  file_handler:
+    enabled: true
+    filename: pipeline.log
+
+# Configurações para tratamento MAX
+max_processor:
+  status_em_aberto: "Aberto"
+  columns:
+    required: ["CPFCNPJ_CLIENTE", "NUMERO_CONTRATO", "PARCELA", "VENCIMENTO", "VALOR"]
+  validation:
+    chave_regex: "^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)+$"
+    remover_parcela_duplicada: true
+    bloquear_tipo_parcela_vazio: false
+  export:
+    filename_prefix: max_tratada
+    inconsistencies_prefix: max_inconsistencias
+
+vic_processor:
+  status_em_aberto: "EM ABERTO"
+  status_baixa: "BAIXADO"
+  tipos_validos: ["PROSOLUTO", "ITBI", "EVOLUCAO DE OBRA"]
+  aging_minimo: 90
+  filtros_inclusao:
+    status_em_aberto: true
+    tipos_validos: true
+    aging: true
+    blacklist: true
+  filtros_baixa:
+    status_baixa: true
+    tipos_validos: true
+    aging: false
+    blacklist: true
+  phone_columns:
+    - "TEL. RESIDENCIAL"
+    - "TEL. COMERCIAL"
+    - "TEL. CELULAR"
+  export:
+    base_limpa_prefix: vic_base_limpa
+    inconsistencies_prefix: vic_inconsistencias
+
+enriquecimento_vic:
+  phone_columns:
+    - "TEL. RESIDENCIAL"
+    - "TEL. COMERCIAL"
+    - "TEL. CELULAR"
+  email_columns:
+    - "EMAIL"
+  observacao_prefix: "Base Vic - "
+  date_format: "%d/%m/%Y"
+  export:
+    filename_prefix: "enriquecimento_vic"
+    subdir: "enriquecimento"
+    add_timestamp: true
+  telefone_principal_flag: "1"
+  telefone_principal_em_todos: true
+
+devolucao:
+  campanha_termo: ""
+  status_excluir: []
+  chaves:
+    vic: "CHAVE"
+    max: "PARCELA"
+  filtros_max:
+    status_em_aberto: true
+    tipos_validos: false
+    blacklist: false
+  export:
+    filename_prefix: "vic_devolucao"
+    subdir: "devolucao"
+    judicial_subdir: "devolucao/jud"
+    extrajudicial_subdir: "devolucao/extra"
+    geral_subdir: "devolucao"
+  status_devolucao_fixo: "98"
+
+batimento_processor:
+  export:
+    filename_prefix: "vic_batimento"
+
+baixa_processor:
+  chave:
+    vic: "CHAVE"
+    max: "PARCELA"
+    coluna_auxiliar: "__CHAVE_BAIXA__"
+    combination:
+      vic:
+        - ["NUMERO_CONTRATO"]
+        - ["PARCELA"]
+      max:
+        - ["PARCELA"]
+  filtros_max:
+    status_em_aberto: true
+    tipos_validos: false
+    blacklist: false
+  export:
+    filename_prefix: "vic_baixa"
+    subdir: "baixa"
+    judicial_subdir: "baixa/jud"
+    extrajudicial_subdir: "baixa/extra"
+    geral_subdir: "baixa"
+  campanha_prefix: "Base Vic - "

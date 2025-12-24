@@ -1,0 +1,1 @@
+"""Módulo utilitários do projeto Tabelionato (src/utils)."""

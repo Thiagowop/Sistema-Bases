@@ -1,0 +1,111 @@
+# Python artefacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+.env/
+venv.bak/
+.venv/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Dados do Tabelionato (entrada) - bloquear conteúdo mas manter estrutura
+data/input/*
+!data/input/.gitkeep
+!data/input/max/
+data/input/max/*
+!data/input/max/.gitkeep
+!data/input/tabelionato/
+data/input/tabelionato/*
+!data/input/tabelionato/.gitkeep
+!data/input/tabelionato\ custas/
+data/input/tabelionato\ custas/*
+!data/input/tabelionato\ custas/.gitkeep
+
+# Dados gerados (saida) - bloquear conteúdo mas manter estrutura  
+data/output/*
+!data/output/.gitkeep
+!data/output/max_tratada/
+data/output/max_tratada/*
+!data/output/max_tratada/.gitkeep
+!data/output/tabelionato_tratada/
+data/output/tabelionato_tratada/*
+!data/output/tabelionato_tratada/.gitkeep
+!data/output/batimento/
+data/output/batimento/*
+!data/output/batimento/.gitkeep
+!data/output/inconsistencias/
+data/output/inconsistencias/*
+!data/output/inconsistencias/.gitkeep
+!data/output/baixa/
+data/output/baixa/*
+!data/output/baixa/.gitkeep
+
+# Logs - bloquear conteúdo mas manter estrutura
+data/logs/*
+!data/logs/.gitkeep
+*.log
+
+# Arquivos compactados (dados sensíveis)
+*.zip
+*.rar
+*.7z
+
+# Arquivos temporarios
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# Configuracoes locais
+.env
+config/local_*.yaml
+config/secrets.yaml
+
+# Backups
+*.bak
+*.backup
+
+# Notebooks
+.ipynb_checkpoints
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pasta bin: manter apenas o pacote compactado do 7-Zip
+bin/*
+!bin/7_zip_rar.zip
