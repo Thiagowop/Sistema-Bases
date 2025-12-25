@@ -1,0 +1,213 @@
+# Tabelionato Client Configuration
+# Unified Pipeline System
+
+name: tabelionato
+version: "1.0"
+description: "Tabelionato Processing Pipeline - Carteira de registros de cartório"
+
+# Data source: Client data (Tabelionato)
+client_source:
+  loader:
+    type: email
+    params:
+      subject_filter: "TABELIONATO"
+      sender_filter: ""
+      days_back: 7
+      attachment_pattern: "*.zip"
+      encoding: "utf-8-sig"
+      separator: ";"
+
+  # Key generation (composite)
+  key:
+    type: composite
+    components:
+      - CPF_CNPJ
+      - PROTOCOLO
+    separator: "-"
+    output_column: CHAVE
+
+  columns:
+    DOCUMENTO: CPF_CNPJ
+    NR_PROTOCOLO: PROTOCOLO
+    VL_DIVIDA: SALDO
+    DT_REGISTRO: VENCIMENTO
+    NM_DEVEDOR: NOME
+    CARTORIO: CARTORIO
+    CIDADE_CARTORIO: CIDADE
+
+  required_columns:
+    - CPF_CNPJ
+    - PROTOCOLO
+    - SALDO
+
+  validators:
+    - type: required
+      enabled: true
+      params:
+        columns:
+          - CPF_CNPJ
+          - PROTOCOLO
+          - SALDO
+
+    - type: regex
+      enabled: true
+      params:
+        column: CPF_CNPJ
+        pattern: "^\\d{11}$|^\\d{14}$"
+        mode: fullmatch
+
+  splitters: []
+
+  export:
+    filename_prefix: tabelionato
+    format: zip
+    encoding: utf-8-sig
+    separator: ";"
+
+# Data source: MAX data
+max_source:
+  loader:
+    type: sql
+    params:
+      server: "${SQL_SERVER}"
+      database: "MAX"
+      query: |
+        SELECT
+          CHAVE,
+          CPF_CNPJ,
+          PROTOCOLO,
+          SALDO,
+          VENCIMENTO,
+          NOME,
+          CARTORIO,
+          CIDADE,
+          STATUS
+        FROM dbo.VW_CARTEIRA_TABELIONATO
+        WHERE STATUS = 'ATIVO'
+
+  key:
+    type: column
+    column: CHAVE
+    output_column: CHAVE
+
+  columns: {}
+  required_columns: []
+  validators: []
+  splitters: []
+
+# Pipeline configuration
+pipeline:
+  processors:
+    - type: tratamento
+      enabled: true
+      params:
+        cpf_columns:
+          - CPF_CNPJ
+        value_columns:
+          - SALDO
+        date_columns:
+          - VENCIMENTO
+        text_columns:
+          - NOME
+          - CARTORIO
+          - CIDADE
+        remove_duplicates: true
+        key_column: CHAVE
+        drop_empty: true
+
+    - type: batimento
+      enabled: true
+      params:
+        client_key: CHAVE
+        max_key: CHAVE
+        compute_a_minus_b: true
+        compute_b_minus_a: true
+        compute_intersection: false
+        export_format: zip
+
+    - type: baixa
+      enabled: true
+      params:
+        client_key: CHAVE
+        max_key: CHAVE
+        export_format: zip
+        add_timestamp: true
+        export_columns:
+          - CPF_CNPJ
+          - PROTOCOLO
+          - CHAVE
+          - CARTORIO
+
+    - type: devolucao
+      enabled: true
+      params:
+        client_key: CHAVE
+        max_key: CHAVE
+        judicial_source: "${JUDICIAL_TABELIONATO_PATH}"
+        judicial_column: CPF_CNPJ
+        target_column: CPF_CNPJ
+        export_format: zip
+        add_timestamp: true
+        add_motivo: true
+        add_data: true
+        select_columns:
+          - CPF_CNPJ
+          - PROTOCOLO
+          - NOME
+          - SALDO
+          - CARTORIO
+          - CIDADE
+          - MOTIVO_DEVOLUCAO
+          - DATA_DEVOLUCAO
+
+    - type: enriquecimento
+      enabled: true
+      params:
+        filename_prefix: tabelionato_novos
+        export_format: zip
+        add_timestamp: true
+        computed_fields:
+          DATA_CARGA:
+            type: date
+            format: "%d/%m/%Y"
+          ORIGEM:
+            type: constant
+            value: "TABELIONATO"
+          TIPO_REGISTRO:
+            type: constant
+            value: "PROTESTO"
+        max_filters:
+          format_cpf: true
+          cpf_column: CPF_CNPJ
+        splitters:
+          - type: field_value
+            enabled: true
+            params:
+              column: CIDADE
+              mode: exact
+              normalize: true
+              mappings:
+                sao_paulo:
+                  - SAO PAULO
+                  - SP
+                rio_janeiro:
+                  - RIO DE JANEIRO
+                  - RJ
+                belo_horizonte:
+                  - BELO HORIZONTE
+                  - BH
+              default_group: outras_cidades
+
+# Global settings
+global:
+  timezone: "America/Sao_Paulo"
+  log_level: "INFO"
+
+# Extension class (optional)
+extension_class: null
+
+# Custom paths
+paths:
+  output_dir: "./output/tabelionato"
+  temp_dir: "./temp/tabelionato"
+  archive_dir: "./archive/tabelionato"
