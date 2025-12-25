@@ -33,6 +33,10 @@ class ValidatorType(str, Enum):
     BLACKLIST = "blacklist"
     REGEX = "regex"
     CAMPAIGN = "campaign"
+    STATUS = "status"
+    TYPE_FILTER = "type_filter"
+    LINEBREAK = "linebreak"
+    DATERANGE = "daterange"
     CUSTOM = "custom"
 
 

@@ -64,6 +64,16 @@ client_source:
           - VENCIMENTO
           - VALOR
 
+    - type: type_filter
+      enabled: true
+      params:
+        column: TIPO_PAGTO
+        exclude:
+          - PERMUTA
+          - Financiamento Fixo
+        case_sensitive: false
+        match_mode: exact
+
   splitters: []
 
   export:

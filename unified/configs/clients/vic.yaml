@@ -59,6 +59,24 @@ client_source:
         max_age_days: 1825  # 5 years
         null_action: include
 
+    - type: status
+      enabled: true
+      params:
+        column: STATUS_TITULO
+        include:
+          - EM ABERTO
+        case_sensitive: false
+
+    - type: type_filter
+      enabled: true
+      params:
+        column: TIPO_PARCELA
+        exclude:
+          - ENTRADA
+          - TAXA
+        case_sensitive: false
+        match_mode: exact
+
   splitters: []
 
   export:
