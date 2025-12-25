@@ -14,6 +14,10 @@ from .aging import AgingValidator, create_aging_validator
 from .blacklist import BlacklistValidator, create_blacklist_validator
 from .regex import RegexValidator, create_regex_validator
 from .campaign import CampaignValidator, create_campaign_validator
+from .status import StatusValidator, create_status_validator
+from .type_filter import TypeFilterValidator, create_type_filter_validator
+from .linebreak import LineBreakValidator, create_linebreak_validator
+from .daterange import DateRangeValidator, create_daterange_validator
 
 
 # Registry of validator factories
@@ -23,6 +27,10 @@ _VALIDATOR_REGISTRY: dict[ValidatorType, Callable[[ValidatorConfig], BaseValidat
     ValidatorType.BLACKLIST: create_blacklist_validator,
     ValidatorType.REGEX: create_regex_validator,
     ValidatorType.CAMPAIGN: create_campaign_validator,
+    ValidatorType.STATUS: create_status_validator,
+    ValidatorType.TYPE_FILTER: create_type_filter_validator,
+    ValidatorType.LINEBREAK: create_linebreak_validator,
+    ValidatorType.DATERANGE: create_daterange_validator,
 }
 
 
@@ -69,6 +77,10 @@ __all__ = [
     "BlacklistValidator",
     "RegexValidator",
     "CampaignValidator",
+    "StatusValidator",
+    "TypeFilterValidator",
+    "LineBreakValidator",
+    "DateRangeValidator",
     "create_validator",
     "register_validator",
 ]
