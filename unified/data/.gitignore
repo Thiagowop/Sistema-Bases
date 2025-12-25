@@ -1,0 +1,10 @@
+# Ignore all data files
+*.csv
+*.zip
+*.xlsx
+*.xls
+*.rar
+
+# But keep directory structure
+!.gitkeep
+!.gitignore
