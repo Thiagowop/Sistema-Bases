@@ -1,0 +1,205 @@
+# VIC Client Configuration
+# Unified Pipeline System
+
+name: vic
+version: "1.0"
+description: "VIC/MAX Processing Pipeline - Carteira de crédito VIC"
+
+# Data source: Client data (VIC)
+client_source:
+  loader:
+    type: email
+    params:
+      subject_filter: "VIC"
+      sender_filter: ""
+      days_back: 7
+      attachment_pattern: "*.zip"
+      encoding: "utf-8-sig"
+      separator: ";"
+
+  # Key generation (composite)
+  key:
+    type: composite
+    components:
+      - CPF_CNPJ
+      - CONTRATO
+      - PARCELA
+    separator: "-"
+    output_column: CHAVE
+
+  # Column mappings (normalize names)
+  columns:
+    DOCUMENTO: CPF_CNPJ
+    NR_CONTRATO: CONTRATO
+    NR_PARCELA: PARCELA
+    VL_SALDO: SALDO
+    DT_VENCIMENTO: VENCIMENTO
+    NM_CLIENTE: NOME
+
+  required_columns:
+    - CPF_CNPJ
+    - CONTRATO
+    - PARCELA
+    - SALDO
+    - VENCIMENTO
+
+  validators:
+    - type: required
+      enabled: true
+      params:
+        columns:
+          - CPF_CNPJ
+          - CONTRATO
+          - SALDO
+
+    - type: aging
+      enabled: true
+      params:
+        date_column: VENCIMENTO
+        max_age_days: 1825  # 5 years
+        null_action: include
+
+  splitters: []
+
+  export:
+    filename_prefix: vic
+    format: zip
+    encoding: utf-8-sig
+    separator: ";"
+
+# Data source: MAX data
+max_source:
+  loader:
+    type: sql
+    params:
+      server: "${SQL_SERVER}"
+      database: "MAX"
+      query: |
+        SELECT
+          CPF_CNPJ,
+          CONTRATO,
+          PARCELA,
+          SALDO,
+          VENCIMENTO,
+          NOME,
+          CAMPANHA
+        FROM dbo.VW_CARTEIRA_VIC
+        WHERE STATUS = 'ATIVO'
+
+  key:
+    type: composite
+    components:
+      - CPF_CNPJ
+      - CONTRATO
+      - PARCELA
+    separator: "-"
+    output_column: CHAVE
+
+  columns: {}
+  required_columns: []
+  validators: []
+  splitters: []
+
+# Pipeline configuration
+pipeline:
+  processors:
+    - type: tratamento
+      enabled: true
+      params:
+        cpf_columns:
+          - CPF_CNPJ
+        value_columns:
+          - SALDO
+        date_columns:
+          - VENCIMENTO
+        remove_duplicates: true
+        key_column: CHAVE
+
+    - type: batimento
+      enabled: true
+      params:
+        client_key: CHAVE
+        max_key: CHAVE
+        compute_a_minus_b: true   # novos
+        compute_b_minus_a: true   # baixas
+        compute_intersection: false
+        export_format: zip
+        encoding: utf-8-sig
+        separator: ";"
+
+    - type: baixa
+      enabled: true
+      params:
+        client_key: CHAVE
+        max_key: CHAVE
+        export_format: zip
+        add_timestamp: true
+        export_columns:
+          - CPF_CNPJ
+          - CONTRATO
+          - PARCELA
+          - CHAVE
+
+    - type: devolucao
+      enabled: true
+      params:
+        client_key: CHAVE
+        max_key: CHAVE
+        judicial_source: "${JUDICIAL_FILE_PATH}"
+        judicial_column: CPF_CNPJ
+        target_column: CPF_CNPJ
+        export_format: zip
+        add_timestamp: true
+        add_motivo: true
+        add_data: true
+        select_columns:
+          - CPF_CNPJ
+          - CONTRATO
+          - PARCELA
+          - NOME
+          - SALDO
+          - MOTIVO_DEVOLUCAO
+          - DATA_DEVOLUCAO
+
+    - type: enriquecimento
+      enabled: true
+      params:
+        filename_prefix: vic_novos
+        export_format: zip
+        add_timestamp: true
+        computed_fields:
+          DATA_CARGA:
+            type: date
+            format: "%d/%m/%Y"
+          ORIGEM:
+            type: constant
+            value: "VIC"
+        splitters:
+          - type: campaign
+            enabled: true
+            params:
+              column: CAMPANHA
+              rules:
+                - name: cobranca
+                  patterns:
+                    - COBRANCA
+                    - COB
+                - name: recuperacao
+                  patterns:
+                    - RECUPERACAO
+                    - REC
+              default_group: outros
+
+# Global settings
+global:
+  timezone: "America/Sao_Paulo"
+  log_level: "INFO"
+
+# Extension class (optional - for complex custom logic)
+extension_class: null
+
+# Custom paths
+paths:
+  output_dir: "./output/vic"
+  temp_dir: "./temp/vic"
+  archive_dir: "./archive/vic"

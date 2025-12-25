@@ -1,0 +1,242 @@
+# EMCCAMP Client Configuration
+# Unified Pipeline System
+
+name: emccamp
+version: "1.0"
+description: "EMCCAMP/TOTVS Processing Pipeline - Integração com API TOTVS"
+
+# Data source: Client data (EMCCAMP via API TOTVS)
+client_source:
+  loader:
+    type: api
+    params:
+      base_url: "${TOTVS_API_URL}"
+      endpoint: "/api/v1/carteira"
+      method: GET
+      auth_type: bearer
+      token: "${TOTVS_API_TOKEN}"
+      paginated: true
+      page_param: page
+      page_size_param: pageSize
+      page_size: 100
+      data_key: "data.items"
+      max_pages: 100
+      timeout: 60
+      max_retries: 3
+      retry_delay: 5
+      headers:
+        Accept: "application/json"
+        X-Client-ID: "EMCCAMP"
+
+  # Key generation (column-based - TOTVS provides unique key)
+  key:
+    type: column
+    column: CODIGO_UNICO
+    output_column: CHAVE
+
+  columns:
+    codigoUnico: CODIGO_UNICO
+    cpfCnpj: CPF_CNPJ
+    numeroContrato: CONTRATO
+    numeroParcela: PARCELA
+    valorSaldo: SALDO
+    dataVencimento: VENCIMENTO
+    nomeCliente: NOME
+    telefone: TELEFONE
+    email: EMAIL
+    endereco: ENDERECO
+    cidade: CIDADE
+    uf: UF
+    cep: CEP
+    campanha: CAMPANHA
+
+  required_columns:
+    - CODIGO_UNICO
+    - CPF_CNPJ
+    - SALDO
+
+  validators:
+    - type: required
+      enabled: true
+      params:
+        columns:
+          - CPF_CNPJ
+          - SALDO
+
+    - type: aging
+      enabled: true
+      params:
+        date_column: VENCIMENTO
+        max_age_days: 3650  # 10 years
+        null_action: include
+
+    - type: campaign
+      enabled: true
+      params:
+        column: CAMPANHA
+        include: []
+        exclude:
+          - CANCELADO
+          - QUITADO
+
+  splitters: []
+
+  export:
+    filename_prefix: emccamp
+    format: zip
+    encoding: utf-8-sig
+    separator: ";"
+
+# Data source: MAX data
+max_source:
+  loader:
+    type: sql
+    params:
+      server: "${SQL_SERVER}"
+      database: "MAX"
+      query: |
+        SELECT
+          CHAVE,
+          CPF_CNPJ,
+          CONTRATO,
+          PARCELA,
+          SALDO,
+          VENCIMENTO,
+          NOME,
+          CAMPANHA,
+          STATUS
+        FROM dbo.VW_CARTEIRA_EMCCAMP
+        WHERE STATUS = 'ATIVO'
+
+  key:
+    type: column
+    column: CHAVE
+    output_column: CHAVE
+
+  columns: {}
+  required_columns: []
+  validators: []
+  splitters: []
+
+# Pipeline configuration
+pipeline:
+  processors:
+    - type: tratamento
+      enabled: true
+      params:
+        cpf_columns:
+          - CPF_CNPJ
+        phone_columns:
+          - TELEFONE
+        value_columns:
+          - SALDO
+        date_columns:
+          - VENCIMENTO
+        text_columns:
+          - NOME
+          - CIDADE
+          - UF
+        remove_duplicates: true
+        key_column: CHAVE
+
+    - type: batimento
+      enabled: true
+      params:
+        client_key: CHAVE
+        max_key: CHAVE
+        compute_a_minus_b: true
+        compute_b_minus_a: true
+        compute_intersection: true
+        enhanced: true
+        compare_values: true
+        value_column: SALDO
+        export_format: zip
+
+    - type: baixa
+      enabled: true
+      params:
+        client_key: CHAVE
+        max_key: CHAVE
+        export_format: zip
+        add_timestamp: true
+        splitters:
+          - type: field_value
+            enabled: true
+            params:
+              column: CAMPANHA
+              mode: contains
+              mappings:
+                cobranca:
+                  - COBRANCA
+                recuperacao:
+                  - RECUPERACAO
+              default_group: outros
+
+    - type: devolucao
+      enabled: true
+      params:
+        client_key: CHAVE
+        max_key: CHAVE
+        judicial_source: "${JUDICIAL_EMCCAMP_PATH}"
+        judicial_column: CPF_CNPJ
+        target_column: CPF_CNPJ
+        export_format: zip
+        add_timestamp: true
+        add_motivo: true
+        add_data: true
+
+    - type: enriquecimento
+      enabled: true
+      params:
+        filename_prefix: emccamp_novos
+        export_format: zip
+        add_timestamp: true
+        computed_fields:
+          DATA_CARGA:
+            type: date
+            format: "%d/%m/%Y"
+          ORIGEM:
+            type: constant
+            value: "EMCCAMP"
+          ENDERECO_COMPLETO:
+            type: concat
+            columns:
+              - ENDERECO
+              - CIDADE
+              - UF
+              - CEP
+            separator: " - "
+        max_filters:
+          format_cpf: true
+          cpf_column: CPF_CNPJ
+          phone_column: TELEFONE
+        select_columns:
+          - CHAVE
+          - CPF_CNPJ
+          - CONTRATO
+          - PARCELA
+          - NOME
+          - SALDO
+          - VENCIMENTO
+          - TELEFONE
+          - EMAIL
+          - ENDERECO_COMPLETO
+          - CAMPANHA
+          - DATA_CARGA
+          - ORIGEM
+
+# Global settings
+global:
+  timezone: "America/Sao_Paulo"
+  log_level: "INFO"
+  api_timeout: 60
+  retry_on_api_error: true
+
+# Extension class (optional)
+extension_class: null
+
+# Custom paths
+paths:
+  output_dir: "./output/emccamp"
+  temp_dir: "./temp/emccamp"
+  archive_dir: "./archive/emccamp"

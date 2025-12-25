@@ -1,0 +1,21 @@
+# Unified Pipeline System - Dependencies
+
+# Core
+pandas>=2.0.0
+pyyaml>=6.0
+openpyxl>=3.1.0
+
+# API
+flask>=3.0.0
+requests>=2.31.0
+
+# Database (optional - install based on need)
+# pyodbc>=5.0.0
+# pymssql>=2.2.0
+
+# Development
+pytest>=7.4.0
+pytest-cov>=4.1.0
+black>=23.0.0
+mypy>=1.5.0
+ruff>=0.1.0
