@@ -31,7 +31,6 @@ data/logs/*
 !data/logs/.gitkeep
 
 # Data outputs (preserve placeholders)
-data/output/*
 data/output/*/*
 data/output/*/*/*
 !data/output/.gitkeep
