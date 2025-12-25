@@ -1,121 +1,112 @@
 # EMCCAMP Client Configuration
-# Unified Pipeline System
+# Unified Pipeline System - Based on real data structure
 
 name: emccamp
 version: "1.0"
-description: "EMCCAMP/TOTVS Processing Pipeline - Integração com API TOTVS"
+description: "EMCCAMP Processing Pipeline - Carteira EMCCAMP"
 
-# Data source: Client data (EMCCAMP via API TOTVS)
+# Data source: Client data (EMCCAMP from ZIP file)
 client_source:
   loader:
-    type: api
+    type: file
     params:
-      base_url: "${TOTVS_API_URL}"
-      endpoint: "/api/v1/carteira"
-      method: GET
-      auth_type: bearer
-      token: "${TOTVS_API_TOKEN}"
-      paginated: true
-      page_param: page
-      page_size_param: pageSize
-      page_size: 100
-      data_key: "data.items"
-      max_pages: 100
-      timeout: 60
-      max_retries: 3
-      retry_delay: 5
-      headers:
-        Accept: "application/json"
-        X-Client-ID: "EMCCAMP"
+      path: "data/input/emccamp/Emccamp.zip"
+      encoding: "utf-8-sig"
+      separator: ";"
 
-  # Key generation (column-based - TOTVS provides unique key)
+  # Key generation (composite: NUM_VENDA-ID_PARCELA)
   key:
-    type: column
-    column: CODIGO_UNICO
+    type: composite
+    components:
+      - NUM_VENDA
+      - ID_PARCELA
+    separator: "-"
     output_column: CHAVE
 
+  # Column mappings from source to standard names
   columns:
-    codigoUnico: CODIGO_UNICO
-    cpfCnpj: CPF_CNPJ
-    numeroContrato: CONTRATO
-    numeroParcela: PARCELA
-    valorSaldo: SALDO
-    dataVencimento: VENCIMENTO
-    nomeCliente: NOME
-    telefone: TELEFONE
-    email: EMAIL
-    endereco: ENDERECO
-    cidade: CIDADE
-    uf: UF
-    cep: CEP
-    campanha: CAMPANHA
+    CLIENTE: NOME_RAZAO_SOCIAL
+    CPF: CPFCNPJ_CLIENTE
+    NUM_VENDA: CONTRATO
+    ID_PARCELA: PARCELA
+    VENCIMENTO: VENCIMENTO
+    VALOR_ATUALIZADO: VALOR
+    NOME_EMPREENDIMENTO: EMPREENDIMENTO
+    DSC_SIT_VENDA: STATUS_TITULO
+    TIPO_PAGTO: TIPO_PAGTO
+    VALOR_ORIGINAL: VALOR_ORIGINAL
+    CNPJ_EMPREENDIMENTO: CNPJ_EMPREENDIMENTO
+    TELEFONE: TELEFONE
+    EMAIL: EMAIL
+    RUA: RUA
+    NUMERO: NUMERO
+    COMPLEMENTO: COMPLEMENTO
+    CEP: CEP
+    BAIRRO: BAIRRO
+    CIDADE: CIDADE
+    UF: UF
 
   required_columns:
-    - CODIGO_UNICO
-    - CPF_CNPJ
-    - SALDO
+    - CPFCNPJ_CLIENTE
+    - CONTRATO
+    - PARCELA
+    - VENCIMENTO
+    - VALOR
 
   validators:
     - type: required
       enabled: true
       params:
         columns:
-          - CPF_CNPJ
-          - SALDO
-
-    - type: aging
-      enabled: true
-      params:
-        date_column: VENCIMENTO
-        max_age_days: 3650  # 10 years
-        null_action: include
-
-    - type: campaign
-      enabled: true
-      params:
-        column: CAMPANHA
-        include: []
-        exclude:
-          - CANCELADO
-          - QUITADO
+          - CPFCNPJ_CLIENTE
+          - CONTRATO
+          - PARCELA
+          - VENCIMENTO
+          - VALOR
 
   splitters: []
 
   export:
-    filename_prefix: emccamp
+    filename_prefix: emccamp_tratada
     format: zip
     encoding: utf-8-sig
     separator: ";"
 
-# Data source: MAX data
+# Data source: MAX data (from ZIP file)
 max_source:
   loader:
-    type: sql
+    type: file
     params:
-      server: "${SQL_SERVER}"
-      database: "MAX"
-      query: |
-        SELECT
-          CHAVE,
-          CPF_CNPJ,
-          CONTRATO,
-          PARCELA,
-          SALDO,
-          VENCIMENTO,
-          NOME,
-          CAMPANHA,
-          STATUS
-        FROM dbo.VW_CARTEIRA_EMCCAMP
-        WHERE STATUS = 'ATIVO'
+      path: "data/input/base_max/MaxSmart.zip"
+      encoding: "utf-8-sig"
+      separator: ";"
 
+  # MAX uses PARCELA as CHAVE directly
   key:
     type: column
-    column: CHAVE
+    column: PARCELA
     output_column: CHAVE
 
-  columns: {}
-  required_columns: []
-  validators: []
+  # Column mappings
+  columns:
+    CPFCNPJ_CLIENTE: CPF_CNPJ
+    VENCIMENTO: DATA_VENCIMENTO
+
+  required_columns:
+    - NUMERO_CONTRATO
+    - PARCELA
+    - VENCIMENTO
+    - VALOR
+    - CPFCNPJ_CLIENTE
+
+  validators:
+    - type: regex
+      enabled: true
+      params:
+        column: PARCELA
+        pattern: "^[0-9]{3,}-[0-9]{2,}$"
+        mode: fullmatch
+
   splitters: []
 
 # Pipeline configuration
@@ -124,18 +115,30 @@ pipeline:
     - type: tratamento
       enabled: true
       params:
+        column_mappings:
+          CLIENTE: NOME_RAZAO_SOCIAL
+          CPF: CPFCNPJ_CLIENTE
+          NUM_VENDA: CONTRATO
+          ID_PARCELA: PARCELA
+          VALOR_ATUALIZADO: VALOR
+          NOME_EMPREENDIMENTO: EMPREENDIMENTO
+          DSC_SIT_VENDA: STATUS_TITULO
         cpf_columns:
-          - CPF_CNPJ
+          - CPFCNPJ_CLIENTE
+          - CPF
         phone_columns:
           - TELEFONE
         value_columns:
-          - SALDO
+          - VALOR
+          - VALOR_ORIGINAL
+          - VALOR_ATUALIZADO
         date_columns:
           - VENCIMENTO
+          - DATA_VENCIMENTO
         text_columns:
-          - NOME
-          - CIDADE
-          - UF
+          - NOME_RAZAO_SOCIAL
+          - CLIENTE
+          - EMPREENDIMENTO
         remove_duplicates: true
         key_column: CHAVE
 
@@ -144,42 +147,47 @@ pipeline:
       params:
         client_key: CHAVE
         max_key: CHAVE
-        compute_a_minus_b: true
-        compute_b_minus_a: true
-        compute_intersection: true
-        enhanced: true
-        compare_values: true
-        value_column: SALDO
+        compute_a_minus_b: true   # novos (EMCCAMP not in MAX)
+        compute_b_minus_a: true   # baixas (MAX not in EMCCAMP)
+        compute_intersection: false
         export_format: zip
+        encoding: utf-8-sig
+        separator: ";"
+        # Filter out specific payment types
+        filter_types:
+          column: TIPO_PAGTO
+          exclude:
+            - PERMUTA
+            - Financiamento Fixo
 
     - type: baixa
       enabled: true
       params:
         client_key: CHAVE
         max_key: CHAVE
+        status_baixa_fixo: "98"
         export_format: zip
         add_timestamp: true
-        splitters:
-          - type: field_value
-            enabled: true
-            params:
-              column: CAMPANHA
-              mode: contains
-              mappings:
-                cobranca:
-                  - COBRANCA
-                recuperacao:
-                  - RECUPERACAO
-              default_group: outros
+        export_columns:
+          - CPFCNPJ_CLIENTE
+          - NOME_RAZAO_SOCIAL
+          - NUMERO_CONTRATO
+          - PARCELA
+          - CHAVE
+          - VENCIMENTO
+          - VALOR
+          - STATUS_TITULO
 
     - type: devolucao
       enabled: true
       params:
         client_key: CHAVE
         max_key: CHAVE
-        judicial_source: "${JUDICIAL_EMCCAMP_PATH}"
+        campanha_termo: "EMCCAMP"
+        judicial_source: "data/input/judicial/ClientesJudiciais.zip"
         judicial_column: CPF_CNPJ
-        target_column: CPF_CNPJ
+        target_column: CPFCNPJ_CLIENTE
+        status_devolucao_fixo: "98"
         export_format: zip
         add_timestamp: true
         add_motivo: true
@@ -188,55 +196,63 @@ pipeline:
     - type: enriquecimento
       enabled: true
       params:
-        filename_prefix: emccamp_novos
+        filename_prefix: emccamp_batimento
         export_format: zip
         add_timestamp: true
         computed_fields:
           DATA_CARGA:
             type: date
             format: "%d/%m/%Y"
-          ORIGEM:
+          CREDOR:
             type: constant
             value: "EMCCAMP"
-          ENDERECO_COMPLETO:
-            type: concat
-            columns:
-              - ENDERECO
-              - CIDADE
-              - UF
-              - CEP
-            separator: " - "
+          CNPJ_CREDOR:
+            type: constant
+            value: "19.403.252/0001-90"
         max_filters:
-          format_cpf: true
-          cpf_column: CPF_CNPJ
-          phone_column: TELEFONE
+          format_cpf: false
+          cpf_column: CPFCNPJ_CLIENTE
+        # Output layout matching original
         select_columns:
-          - CHAVE
-          - CPF_CNPJ
-          - CONTRATO
-          - PARCELA
-          - NOME
-          - SALDO
-          - VENCIMENTO
-          - TELEFONE
-          - EMAIL
-          - ENDERECO_COMPLETO
           - CAMPANHA
-          - DATA_CARGA
-          - ORIGEM
+          - CREDOR
+          - CNPJ_CREDOR
+          - CPFCNPJ_CLIENTE
+          - NOME_RAZAO_SOCIAL
+          - NUMERO_CONTRATO
+          - EMPREENDIMENTO
+          - DATA_CADASTRO
+          - PARCELA
+          - CHAVE
+          - VENCIMENTO
+          - VALOR
+          - STATUS_TITULO
+          - TIPO_PARCELA
+          - TIPO_PAGTO
 
 # Global settings
 global:
   timezone: "America/Sao_Paulo"
   log_level: "INFO"
-  api_timeout: 60
-  retry_on_api_error: true
+  date_format: "%Y-%m-%d"
+  encoding: "utf-8-sig"
+  csv_separator: ";"
+  add_timestamp_to_files: true
+  empresa:
+    nome: "EMCCAMP"
+    cnpj: "19.403.252/0001-90"
 
 # Extension class (optional)
 extension_class: null
 
+# Input paths (for reference)
+inputs:
+  clientes_judiciais_path: "data/input/judicial/ClientesJudiciais.zip"
+  baixa_emccamp_path: "data/input/baixas/baixa_emccamp.zip"
+  acordos_abertos_path: "data/input/doublecheck_acordo/acordos_abertos.zip"
+
 # Custom paths
 paths:
-  output_dir: "./output/emccamp"
-  temp_dir: "./temp/emccamp"
-  archive_dir: "./archive/emccamp"
+  output_dir: "data/output"
+  temp_dir: "data/temp"
+  logs_dir: "data/logs"
