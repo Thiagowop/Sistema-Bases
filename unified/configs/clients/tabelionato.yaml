@@ -8,60 +8,127 @@ description: "Tabelionato Processing Pipeline - Carteira de registros de cartór
 # Data source: Client data (Tabelionato)
 client_source:
   loader:
-    type: email
+    type: file
     params:
-      subject_filter: "TABELIONATO"
-      sender_filter: ""
-      days_back: 7
-      attachment_pattern: "*.zip"
-      encoding: "utf-8-sig"
+      path: "../Bases referencia/Automacao_Tabelionato/data/input/tabelionato/Tabelionato.zip"
+      password: "Mf4tab@"
+      encoding: "utf-8"
       separator: ";"
-      password: "Mf4tab@"  # Password for encrypted ZIP files
 
-  # Key generation (composite)
+  # Key generation - CHAVE = PROTOCOLO (single column)
   key:
-    type: composite
-    components:
-      - CPF_CNPJ
-      - PROTOCOLO
-    separator: "-"
+    type: column
+    column: PROTOCOLO
     output_column: CHAVE
 
+  # Column mapping: Tabelionato original columns -> Standardized names
+  # Original columns: PROTOCOLO, VRTITULO, DTANUENCIA, DEVEDOR, ENDERECO, CIDADE, CEP, CPFCNPJ, INTIMADO, CUSTAS, CREDOR, DATAEXTRACAO
   columns:
-    DOCUMENTO: CPF_CNPJ
-    NR_PROTOCOLO: PROTOCOLO
-    VL_DIVIDA: SALDO
-    DT_REGISTRO: VENCIMENTO
-    NM_DEVEDOR: NOME
-    CARTORIO: CARTORIO
-    CIDADE_CARTORIO: CIDADE
+    CPFCNPJ: CPF_CNPJ
+    PROTOCOLO: PROTOCOLO
+    VRTITULO: VALOR_TITULO
+    DTANUENCIA: VENCIMENTO
+    DEVEDOR: NOME
+    ENDERECO: ENDERECO
+    CIDADE: CIDADE
+    CEP: CEP
+    INTIMADO: INTIMADO
+    CUSTAS: CUSTAS
+    CREDOR: CREDOR
+    DATAEXTRACAO: DATA_EXTRACAO
 
   required_columns:
-    - CPF_CNPJ
     - PROTOCOLO
-    - SALDO
+    - CPFCNPJ
+    - CUSTAS
 
   validators:
     - type: required
       enabled: true
       params:
         columns:
-          - CPF_CNPJ
           - PROTOCOLO
-          - SALDO
+          - CPFCNPJ
+          - CUSTAS
 
     - type: regex
-      enabled: true
+      enabled: false  # Temporarily disabled - need to implement clean_before
       params:
-        column: CPF_CNPJ
+        column: CPFCNPJ
         pattern: "^\\d{11}$|^\\d{14}$"
         mode: fullmatch
+        clean_before: true  # Remove non-digits before validation
 
     - type: linebreak
       enabled: true
       params:
         check_all: true
-        action: clean  # clean line breaks from all fields
+        action: clean
+
+    - type: daterange
+      enabled: true
+      params:
+        column: DTANUENCIA
+        min_year: 1900
+        max_year: 2100
+        null_action: invalidate
+
+  splitters: []
+
+  export:
+    filename_prefix: tabelionato
+    format: zip
+    encoding: utf-8
+    separator: ";"
+
+
+# Data source: MAX data
+# Columns: CAMPANHA, CREDOR, CNPJ_CREDOR, CPFCNPJ_CLIENTE, NOME_RAZAO_SOCIAL, 
+#          NUMERO_CONTRATO, PARCELA, MOVIMENTACOES_ID, VENCIMENTO, VALOR, STATUS_TITULO
+max_source:
+  loader:
+    type: file
+    params:
+      path: "../Bases referencia/Automacao_Tabelionato/data/input/max/MaxSmart_Tabelionato.zip"
+      encoding: "utf-8-sig"
+      separator: ";"
+
+  # CHAVE = PARCELA (conforme referência Tabelionato)
+  key:
+    type: column
+    column: PARCELA
+    output_column: CHAVE
+
+  columns:
+    CPFCNPJ_CLIENTE: CPF_CNPJ
+    NOME_RAZAO_SOCIAL: NOME
+    NUMERO_CONTRATO: CONTRATO
+    PARCELA: PARCELA
+    VENCIMENTO: VENCIMENTO
+    VALOR: VALOR
+    STATUS_TITULO: STATUS
+    CAMPANHA: CAMPANHA
+
+  required_columns:
+    - PARCELA
+    - VENCIMENTO
+
+  validators:
+    - type: required
+      enabled: true
+      params:
+        columns:
+          - PARCELA
+          - VENCIMENTO
+
+    # PARCELA validation: não pode ser vazia, conter vírgula, parecer data, conter hífen, ou ser muito curta
+    - type: regex
+      enabled: true 
+      params:
+        column: PARCELA
+        pattern: "^[^,\\-]{2,}$"
+        mode: fullmatch
+        reject_date_pattern: true
 
     - type: daterange
       enabled: true
@@ -69,46 +136,10 @@ client_source:
         column: VENCIMENTO
         min_year: 1900
         max_year: 2100
-        null_action: include
+        null_action: invalidate
 
   splitters: []
 
-  export:
-    filename_prefix: tabelionato
-    format: zip
-    encoding: utf-8-sig
-    separator: ";"
-
-# Data source: MAX data
-max_source:
-  loader:
-    type: sql
-    params:
-      server: "${SQL_SERVER}"
-      database: "MAX"
-      query: |
-        SELECT
-          CHAVE,
-          CPF_CNPJ,
-          PROTOCOLO,
-          SALDO,
-          VENCIMENTO,
-          NOME,
-          CARTORIO,
-          CIDADE,
-          STATUS
-        FROM dbo.VW_CARTEIRA_TABELIONATO
-        WHERE STATUS = 'ATIVO'
-
-  key:
-    type: column
-    column: CHAVE
-    output_column: CHAVE
-
-  columns: {}
-  required_columns: []
-  validators: []
-  splitters: []
 
 # Pipeline configuration
 pipeline:

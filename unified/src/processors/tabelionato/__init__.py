@@ -1,0 +1,5 @@
+# Tabelionato Processors
+from .tratamento_tabelionato import TabelionatoProcessor
+from .tratamento_max_tabelionato import MaxTabelionatoProcessor
+from .batimento_tabelionato import BatimentoTabelionatoProcessor
+from .baixa_tabelionato import BaixaTabelionatoProcessor

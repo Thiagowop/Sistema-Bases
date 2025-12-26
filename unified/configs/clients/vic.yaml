@@ -3,79 +3,80 @@
 
 name: vic
 version: "1.0"
-description: "VIC/MAX Processing Pipeline - Carteira de crédito VIC"
+description: "VIC/MAX Processing Pipeline - Carteira de crédito VIC Engenharia"
 
-# Data source: Client data (VIC)
+# Parâmetros específicos do cliente
+params:
+  empresa_cnpj: "12.086.678/0001-18"
+  mo_cliente_id: 232  # VIC Engenharia
+  campanha_judicial_id: 4
+
+# Data source: Client data (VIC via Email)
 client_source:
   loader:
     type: email
     params:
-      subject_filter: "VIC"
-      sender_filter: ""
+      server: "${IMAP_SERVER}"
+      email: "${EMAIL_USER}"
+      password: "${EMAIL_APP_PASSWORD}"
+      sender_filter: "${VIC_EMAIL_SENDER}"
+      subject_filter: "${VIC_EMAIL_SUBJECT}"
+      attachment_pattern: "${VIC_ATTACHMENT_FILENAME}"
       days_back: 7
-      attachment_pattern: "*.zip"
       encoding: "utf-8-sig"
       separator: ";"
 
-  # Key generation (composite)
+  # Key generation (NUMERO_CONTRATO-PARCELA)
   key:
     type: composite
     components:
-      - CPF_CNPJ
-      - CONTRATO
+      - NUMERO_CONTRATO
       - PARCELA
     separator: "-"
     output_column: CHAVE
 
-  # Column mappings (normalize names)
+  # Column mappings - colunas do arquivo VIC
   columns:
-    DOCUMENTO: CPF_CNPJ
-    NR_CONTRATO: CONTRATO
-    NR_PARCELA: PARCELA
-    VL_SALDO: SALDO
-    DT_VENCIMENTO: VENCIMENTO
-    NM_CLIENTE: NOME
+    CPFCNPJ_CLIENTE: CPF_CNPJ
+    NOME_RAZAO_SOCIAL: NOME
+    NUMERO_CONTRATO: NUMERO_CONTRATO
+    PARCELA: PARCELA
+    VENCIMENTO: VENCIMENTO
+    VALOR: VALOR
+    STATUS_TITULO: STATUS_TITULO
+    TIPO_PARCELA: TIPO_PARCELA
 
   required_columns:
-    - CPF_CNPJ
-    - CONTRATO
+    - CPFCNPJ_CLIENTE
+    - NUMERO_CONTRATO
     - PARCELA
-    - SALDO
     - VENCIMENTO
+    - VALOR
 
   validators:
     - type: required
       enabled: true
       params:
         columns:
-          - CPF_CNPJ
-          - CONTRATO
-          - SALDO
-
-    - type: aging
-      enabled: true
-      params:
-        date_column: VENCIMENTO
-        max_age_days: 1825  # 5 years
-        null_action: include
+          - CPFCNPJ_CLIENTE
+          - NUMERO_CONTRATO
+          - PARCELA
 
     - type: status
       enabled: true
       params:
         column: STATUS_TITULO
         include:
+          - Aberto
           - EM ABERTO
         case_sensitive: false
 
-    - type: type_filter
+    - type: aging
       enabled: true
       params:
-        column: TIPO_PARCELA
-        exclude:
-          - ENTRADA
-          - TAXA
-        case_sensitive: false
-        match_mode: exact
+        date_column: VENCIMENTO
+        min_days: 90  # Aging mínimo conforme config referência
+        null_action: include
 
   splitters: []
 
@@ -85,38 +86,65 @@ client_source:
     encoding: utf-8-sig
     separator: ";"
 
-# Data source: MAX data
+# Data source: MAX data (SQL Server)
 max_source:
   loader:
     type: sql
     params:
-      server: "${SQL_SERVER}"
-      database: "MAX"
+      server: "${MSSQL_SERVER_STD}"
+      database: "${MSSQL_DATABASE_STD}"
+      username: "${MSSQL_USER_STD}"
+      password: "${MSSQL_PASSWORD_STD}"
       query: |
-        SELECT
-          CPF_CNPJ,
-          CONTRATO,
-          PARCELA,
-          SALDO,
-          VENCIMENTO,
-          NOME,
-          CAMPANHA
-        FROM dbo.VW_CARTEIRA_VIC
-        WHERE STATUS = 'ATIVO'
+        SELECT DISTINCT
+            dbo.RetornaNomeCampanha(MoCampanhasID,1) AS 'CAMPANHA',
+            dbo.RetornaNomeRazaoSocial(MoClientesID) AS 'CREDOR',
+            dbo.RetornaCPFCNPJ(MoClientesID,1) AS 'CNPJ_CREDOR',
+            dbo.RetornaCPFCNPJ(MoInadimplentesID,1) AS 'CPFCNPJ_CLIENTE',
+            dbo.RetornaNomeRazaoSocial(MoInadimplentesID) AS 'NOME_RAZAO_SOCIAL',
+            MoContrato AS 'NUMERO_CONTRATO',
+            MoMatricula AS 'EMPREENDIMENTO',
+            CAST(MoDataCriacaoRegistro AS DATE) AS 'DATA_CADASTRO',
+            MoNumeroDocumento AS 'PARCELA',
+            Movimentacoes_ID AS 'Movimentacoes_ID',
+            MoDataVencimento AS 'VENCIMENTO',
+            MoValorDocumento AS 'VALOR',
+            dbo.RetornaStatusMovimentacao(MoStatusMovimentacao) AS 'STATUS_TITULO',
+            MoTipoDocumento AS 'TIPO_PARCELA'
+        FROM Movimentacoes
+            INNER JOIN Pessoas ON MoInadimplentesID = Pessoas_ID
+        WHERE
+            (MoStatusMovimentacao = 0 OR MoStatusMovimentacao = 1)
+            AND MoClientesID = 232
+            AND MoOrigemMovimentacao in ('C', 'I')
+        ORDER BY dbo.RetornaCPFCNPJ(MoInadimplentesID,1), MoDataVencimento ASC
 
   key:
     type: composite
     components:
-      - CPF_CNPJ
-      - CONTRATO
+      - NUMERO_CONTRATO
       - PARCELA
     separator: "-"
     output_column: CHAVE
 
-  columns: {}
-  required_columns: []
+  columns:
+    CPFCNPJ_CLIENTE: CPF_CNPJ
+    NOME_RAZAO_SOCIAL: NOME
+    NUMERO_CONTRATO: NUMERO_CONTRATO
+    PARCELA: PARCELA
+    VENCIMENTO: VENCIMENTO
+    VALOR: VALOR
+    STATUS_TITULO: STATUS_TITULO
+    TIPO_PARCELA: TIPO_PARCELA
+
+  required_columns:
+    - CPFCNPJ_CLIENTE
+    - PARCELA
+    - VENCIMENTO
+
   validators: []
   splitters: []
+
 
 # Pipeline configuration
 pipeline:
